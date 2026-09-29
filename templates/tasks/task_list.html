@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}My tasks — Daymark{% endblock %}
+{% block content %}
+<section class="welcome-row">
+  <div><p class="eyebrow">YOUR WORKSPACE <span class="eyebrow-dot"></span> {{ today|date:"l, F j"|upper }}</p><h1>Make today <span>count.</span></h1><p class="subheading">A clear mind starts with a clear plan.</p></div>
+  <a class="button button-primary" href="{% url 'task_create' %}"><span class="button-plus">＋</span> New task</a>
+</section>
+
+<section class="stats-grid" aria-label="Task statistics">
+  <article class="stat-card stat-total"><div class="stat-top"><span class="stat-label">All tasks</span><span class="stat-icon icon-violet">▤</span></div><div class="stat-value">{{ stats.total }}</div><div class="stat-foot">Everything on your plate</div></article>
+  <article class="stat-card"><div class="stat-top"><span class="stat-label">To do</span><span class="stat-icon icon-amber">◷</span></div><div class="stat-value">{{ stats.pending }}</div><div class="stat-foot">Ready when you are</div></article>
+  <article class="stat-card"><div class="stat-top"><span class="stat-label">In progress</span><span class="stat-icon icon-blue">↗</span></div><div class="stat-value">{{ stats.in_progress }}</div><div class="stat-foot">Keep the momentum</div></article>
+  <article class="stat-card"><div class="stat-top"><span class="stat-label">Completed</span><span class="stat-icon icon-green">✓</span></div><div class="stat-value">{{ stats.completed }}</div><div class="stat-foot">Look at you go</div></article>
+  <article class="stat-card stat-overdue"><div class="stat-top"><span class="stat-label">Overdue</span><span class="stat-icon icon-red">!</span></div><div class="stat-value">{{ stats.overdue }}</div><div class="stat-foot">A chance to reset</div></article>
+</section>
+
+<section class="task-section">
+  <div class="section-heading"><div><p class="eyebrow">STAY IN YOUR FLOW</p><h2>Your tasks <span class="count-pill">{{ paginator.count }}</span></h2></div></div>
+  <form class="filter-panel" method="get" action="{% url 'task_list' %}">
+    <label class="search-box"><span aria-hidden="true">⌕</span><input type="search" name="q" value="{{ query }}" placeholder="Search tasks…" aria-label="Search title and description"></label>
+    <label class="select-wrap"><span class="sr-only">Status</span><select name="status"><option value="">All statuses</option>{% for value,label in view.model.Status.choices %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="select-wrap"><span class="sr-only">Priority</span><select name="priority"><option value="">Any priority</option>{% for value,label in view.model.Priority.choices %}<option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }} priority</option>{% endfor %}</select></label>
+    <label class="select-wrap"><span class="sr-only">Due date</span><select name="due"><option value="">Any due date</option><option value="today" {% if selected_due == 'today' %}selected{% endif %}>Due today</option><option value="upcoming" {% if selected_due == 'upcoming' %}selected{% endif %}>Upcoming</option><option value="overdue" {% if selected_due == 'overdue' %}selected{% endif %}>Overdue</option></select></label>
+    <label class="select-wrap sort-wrap"><span class="sr-only">Sort tasks</span><select name="sort"><option value="newest" {% if selected_sort == 'newest' %}selected{% endif %}>Newest first</option><option value="oldest" {% if selected_sort == 'oldest' %}selected{% endif %}>Oldest first</option><option value="due_date" {% if selected_sort == 'due_date' %}selected{% endif %}>Due date</option><option value="priority" {% if selected_sort == 'priority' %}selected{% endif %}>Priority</option><option value="title" {% if selected_sort == 'title' %}selected{% endif %}>Title A–Z</option><option value="updated" {% if selected_sort == 'updated' %}selected{% endif %}>Recently updated</option></select></label>
+    <button class="button button-filter" type="submit">Apply</button>
+    {% if query or selected_status or selected_priority or selected_due or selected_sort != 'newest' %}<a class="clear-filters" href="{% url 'task_list' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if tasks %}
+    <div class="task-list">
+      {% for task in tasks %}
+        <article class="task-card {% if task.is_overdue %}task-card-overdue{% endif %}">
+          <div class="task-check-wrap"><form method="post" action="{% url 'task_toggle' task.pk %}">{% csrf_token %}<input class="task-check" type="checkbox" aria-label="{% if task.status == 'completed' %}Reopen{% else %}Complete{% endif %} {{ task.title }}" {% if task.status == 'completed' %}checked{% endif %} onchange="this.form.submit()"><input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div>
+          <div class="task-main"><div class="task-title-line"><a class="task-title {% if task.status == 'completed' %}is-complete{% endif %}" href="{% url 'task_detail' task.pk %}">{{ task.title }}</a>{% if task.is_overdue %}<span class="overdue-label">OVERDUE</span>{% endif %}</div>{% if task.description %}<p class="task-description">{{ task.description|truncatechars:116 }}</p>{% endif %}<div class="task-meta"><span class="badge status-{{ task.status }}">{{ task.get_status_display }}</span><span class="badge priority-{{ task.priority }}"><span class="priority-dot"></span>{{ task.get_priority_display }}</span>{% if task.due_date %}<span class="due-meta {% if task.is_overdue %}due-late{% endif %}"><span aria-hidden="true">◷</span> {{ task.due_date|date:"M j, Y" }}</span>{% endif %}</div></div>
+          <div class="task-actions"><a class="icon-action" href="{% url 'task_detail' task.pk %}" aria-label="View {{ task.title }}" title="View task">↗</a><a class="icon-action" href="{% url 'task_edit' task.pk %}" aria-label="Edit {{ task.title }}" title="Edit task">✎</a><a class="icon-action delete-action" href="{% url 'task_delete' task.pk %}" aria-label="Delete {{ task.title }}" title="Delete task">×</a></div>
+        </article>
+      {% endfor %}
+    </div>
+    {% if is_paginated %}<nav class="pagination" aria-label="Pagination"><span class="pagination-note">Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ paginator.count }}</span><div class="pagination-links">{% if page_obj.has_previous %}<a href="?{{ filter_query }}&page={{ page_obj.previous_page_number }}" aria-label="Previous page">←</a>{% else %}<span class="disabled">←</span>{% endif %}<span class="page-current">{{ page_obj.number }} / {{ paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?{{ filter_query }}&page={{ page_obj.next_page_number }}" aria-label="Next page">→</a>{% else %}<span class="disabled">→</span>{% endif %}</div></nav>{% endif %}
+  {% else %}
+    <div class="empty-state"><div class="empty-illustration"><span>✓</span><i></i><i></i></div><h3>{% if query or selected_status or selected_priority or selected_due %}No tasks found.{% else %}Your next big thing starts here.{% endif %}</h3><p>{% if query or selected_status or selected_priority or selected_due %}Try changing your search or filters.{% else %}Create a task, clear your head, and make progress one step at a time.{% endif %}</p>{% if query or selected_status or selected_priority or selected_due %}<a class="button button-secondary" href="{% url 'task_list' %}">Clear filters</a>{% else %}<a class="button button-primary" href="{% url 'task_create' %}">Create your first task <span>→</span></a>{% endif %}</div>
+  {% endif %}
+</section>
+{% endblock %}
